@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billy's Big Farm Scramble</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #183b35;
+            color: white;
+            font-family: 'Trebuchet MS', Arial, sans-serif;
+            text-align: center;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            background: #8fca78;
+            display: block;
+            margin: 0 auto;
+            image-rendering: auto;
+        }
+        #ui {
+            top: max(12px, env(safe-area-inset-top));
+            left: 14px;
+            font: 800 15px/1.55 'Trebuchet MS', Arial, sans-serif;
+            letter-spacing: 1px;
+            color: #fff9df;
+            text-shadow: 2px 2px 0 #315344;
+            background: rgba(28, 67, 55, .72);
+            border: 2px solid rgba(255,255,255,.45);
+            border-radius: 14px;
+            padding: 9px 13px;
+        }
+        #gameTitle {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            color: #fff9df; font-weight: 900; font-size: 17px;
+            letter-spacing: 2px; text-shadow: 2px 2px #315344;
+            pointer-events: none; white-space: nowrap;
+        }
+        #mobileControls { display: none; }
+        .control-label {
+            color: white; font: 800 10px Arial, sans-serif; letter-spacing: 1px;
+            text-shadow: 1px 2px 2px #183b35; margin-top: 7px;
+        }
+        #stickBase {
+            position: absolute; left: 22px; bottom: max(24px, env(safe-area-inset-bottom));
+            width: 124px; height: 124px; border-radius: 50%;
+            background: rgba(31, 75, 61, .48); border: 3px solid rgba(255,255,255,.65);
+            box-shadow: inset 0 0 0 5px rgba(255,255,255,.10);
+            touch-action: none;
+        }
+        #stickKnob {
+            position: absolute; width: 54px; height: 54px; left: 32px; top: 32px;
+            border-radius: 50%; background: #fff3c4; border: 3px solid #527c54;
+            box-shadow: 0 3px 0 rgba(0,0,0,.2); pointer-events: none;
+        }
+        #fireButton {
+            position: absolute; right: 24px; bottom: max(38px, env(safe-area-inset-bottom));
+            width: 92px; height: 92px; border-radius: 50%;
+            border: 4px solid #fff4d2; background: #ef8b52; color: white;
+            font: 900 15px 'Trebuchet MS', Arial, sans-serif; letter-spacing: 1px;
+            box-shadow: 0 6px 0 #a94f3c, 0 8px 16px rgba(0,0,0,.25);
+            touch-action: none;
+        }
+        #fireButton:active { transform: translateY(4px); box-shadow: 0 2px 0 #a94f3c; }
+        @media (pointer: coarse), (max-width: 800px) {
+            #mobileControls { display: block; }
+            #ui { font-size: 12px; padding: 7px 10px; }
+            #gameTitle { top: 13px; font-size: 14px; }
+        }
+        #ui {
+            position: absolute; text-align: left; pointer-events: none;
+        }
+        #gameover {
+            position: absolute; z-index: 5; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); display: none; cursor: pointer;
+            color: #fff9df; background: rgba(28,67,55,.94);
+            border: 4px solid #fff4d2; border-radius: 22px;
+            padding: 24px 30px; font-size: clamp(28px, 7vw, 48px);
+            font-weight: 900; box-shadow: 0 12px 30px rgba(0,0,0,.3);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        WAVE: <span id="waveDisplay">1</span><br>
+        LEVEL: <span id="levelDisplay">1</span><br>
+        KILLS: <span id="killDisplay">0</span>
+    </div>
+    <div id="gameTitle">BILLY'S EXTREMELY NORMAL MILK EMERGENCY</div>
+    <div id="gameover" onclick="location.reload()">
+        YOU GOT FARMED.<br>
+        <span style="font-size:17px; color:#fff4d2">The farmers have unionized. Tap to try again.</span>
+    </div>
+    <div id="mobileControls">
+        <div id="stickBase"><div id="stickKnob"></div></div>
+        <button id="fireButton" type="button">MILK!!!</button>
+        <div class="control-label" style="position:absolute;left:43px;bottom:max(7px, env(safe-area-inset-bottom))">MOVE</div>
+        <div class="control-label" style="position:absolute;right:43px;bottom:max(17px, env(safe-area-inset-bottom))">FIRE</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+
+        // Game State
+        let wave = 1;
+        let level = 1;
+        let kills = 0;
+        let gameOver = false;
+        let bossSpawned = false;
+        let spawnRate = 2000;
+        let lastSpawn = 0;
+        let keys = {};
+        let mouse = { x: canvas.width/2, y: canvas.height/2 };
+        let joy = { x: 0, y: 0, active: false, pointerId: null };
+        let firing = false;
+        let lastShot = 0;
+        const stickBase = document.getElementById('stickBase');
+        const stickKnob = document.getElementById('stickKnob');
+        const fireButton = document.getElementById('fireButton');
+
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.code === 'Space') { e.preventDefault(); shoot(); }
+        });
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+        window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+        window.addEventListener('mousedown', e => { if (e.target === canvas) shoot(); });
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        });
+
+        // Touch joystick: drag the knob in any direction to move.
+        function moveStick(e) {
+            const r = stickBase.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            let dx = e.clientX - cx, dy = e.clientY - cy;
+            const max = 36, len = Math.hypot(dx, dy);
+            if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+            joy.x = dx / max; joy.y = dy / max;
+            stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+        stickBase.addEventListener('pointerdown', e => {
+            e.preventDefault(); joy.active = true; joy.pointerId = e.pointerId;
+            stickBase.setPointerCapture(e.pointerId); moveStick(e);
+        });
+        stickBase.addEventListener('pointermove', e => {
+            if (joy.active && e.pointerId === joy.pointerId) moveStick(e);
+        });
+        function releaseStick(e) {
+            if (e.pointerId !== joy.pointerId) return;
+            joy.active = false; joy.x = 0; joy.y = 0; joy.pointerId = null;
+            stickKnob.style.transform = 'translate(0, 0)';
+        }
+        stickBase.addEventListener('pointerup', releaseStick);
+        stickBase.addEventListener('pointercancel', releaseStick);
+        fireButton.addEventListener('pointerdown', e => {
+            e.preventDefault(); firing = true; shoot(); fireButton.setPointerCapture(e.pointerId);
+        });
+        fireButton.addEventListener('pointerup', () => firing = false);
+        fireButton.addEventListener('pointercancel', () => firing = false);
+        fireButton.addEventListener('lostpointercapture', () => firing = false);
+
+        // Entities
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 40,
+            speed: 5
+        };
+
+        const bullets = [];
+        const enemies = [];
+        const particles = [];
+
+        function drawCow(x, y, size) {
+            // Round, friendly cow with tiny horns and a cheerful face.
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.fillStyle = '#fffaf0';
+            ctx.beginPath(); ctx.ellipse(0, 2, size*.48, size*.38, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#34443c';
+            ctx.beginPath(); ctx.ellipse(-size*.19, 0, size*.13, size*.18, -.3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(size*.19, size*.13, size*.11, size*.14, .3, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#fffaf0';
+            ctx.beginPath(); ctx.arc(0, -size*.22, size*.29, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#eaa2a0';
+            ctx.beginPath(); ctx.ellipse(0, -size*.12, size*.19, size*.12, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#293a32';
+            ctx.beginPath(); ctx.arc(-size*.09, -size*.28, 3, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(size*.09, -size*.28, 3, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#f3d28c';
+            ctx.beginPath(); ctx.moveTo(-size*.2,-size*.43); ctx.lineTo(-size*.28,-size*.58); ctx.lineTo(-size*.08,-size*.48); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(size*.2,-size*.43); ctx.lineTo(size*.28,-size*.58); ctx.lineTo(size*.08,-size*.48); ctx.fill();
+            ctx.strokeStyle = '#34443c'; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.arc(0, -size*.1, size*.07, .15, Math.PI-.15); ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawFarmer(x, y, size) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.fillStyle = '#4f7fbd';
+            ctx.beginPath(); ctx.roundRect(-size*.34, -size*.05, size*.68, size*.58, 9); ctx.fill();
+            ctx.fillStyle = '#f2c49a';
+            ctx.beginPath(); ctx.arc(0, -size*.22, size*.31, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = arguments.length > 3 ? arguments[3] : '#e6b94f';
+            ctx.beginPath(); ctx.ellipse(0, -size*.42, size*.39, size*.12, 0, 0, Math.PI*2); ctx.fill();
+            ctx.fillRect(-size*.23, -size*.66, size*.46, size*.25);
+            ctx.fillStyle = '#fff8dc';
+            ctx.fillRect(-size*.075, -size*.15, size*.07, size*.12);
+            ctx.fillRect(size*.005, -size*.15, size*.07, size*.12);
+            ctx.fillStyle = '#28372f';
+            ctx.beginPath(); ctx.arc(-size*.1, -size*.24, 2.5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(size*.1, -size*.24, 2.5, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(0, -size*.11, size*.08, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#d9e5da';
+            ctx.fillRect(size*.3, -size*.2, 4, size*.75);
+            ctx.fillRect(size*.22, -size*.23, size*.2, 4);
+            ctx.restore();
+        }
+
+        function drawBoss(x, y, size) {
+            ctx.save(); ctx.translate(x, y);
+            ctx.fillStyle = '#f7f2df';
+            ctx.beginPath(); ctx.ellipse(0, 12, size*.48, size*.32, 0, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.ellipse(-size*.12, -size*.24, size*.19, size*.28, -.2, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = '#e6a83f';
+            ctx.beginPath(); ctx.moveTo(-size*.12,-size*.42); ctx.lineTo(-size*.4,-size*.35); ctx.lineTo(-size*.12,-size*.28); ctx.fill();
+            ctx.fillStyle = '#26352e';
+            ctx.beginPath(); ctx.arc(-size*.18, -size*.32, 5, 0, Math.PI*2); ctx.fill();
+            ctx.restore();
+        }
+
+        function shoot() {
+            if (gameOver) return;
+            let target = null, nearest = Infinity;
+            for (const e of enemies) {
+                const d = Math.hypot(e.x - player.x, e.y - player.y);
+                if (d < nearest) { nearest = d; target = e; }
+            }
+            const aimX = target ? target.x : mouse.x;
+            const aimY = target ? target.y : mouse.y;
+            const angle = Math.atan2(aimY - player.y, aimX - player.x);
+            
+            // Multi-shot based on level
+            let shots = Math.min(1 + Math.floor((level - 1) / 2), 5); 
+            for(let i=0; i<shots; i++) {
+                let spread = (i - (shots-1)/2) * 0.15;
+                bullets.push({
+                    x: player.x,
+                    y: player.y, // launches a silly cream puff
+                    vx: Math.cos(angle + spread) * 12,
+                    vy: Math.sin(angle + spread) * 12,
+                    size: 13
+                });
+            }
+        }
+
+        function spawnEnemy() {
+            if (wave % 5 === 0 && !bossSpawned) {
+                enemies.push({
+                    x: Math.random() > 0.5 ? -150 : canvas.width + 150,
+                    y: Math.random() * canvas.height,
+                    size: 150, hp: 50 * wave, maxHp: 50 * wave,
+                    speed: 1.2 + (wave * 0.1), isBoss: true
+                });
+                bossSpawned = true;
+            } else if (wave % 5 !== 0) {
+                // A whole crowd of increasingly ridiculous farmers arrives together.
+                const crowdSize = Math.min(3 + Math.floor(wave * 0.8), 14);
+                for (let n = 0; n < crowdSize && enemies.length < 100; n++) {
+                    let side = Math.floor(Math.random() * 4);
+                    let ex = 0, ey = 0;
+                    if(side === 0) { ex = Math.random() * canvas.width; ey = -50; }
+                    if(side === 1) { ex = canvas.width + 50; ey = Math.random() * canvas.height; }
+                    if(side === 2) { ex = Math.random() * canvas.width; ey = canvas.height + 50; }
+                    if(side === 3) { ex = -50; ey = Math.random() * canvas.height; }
+
+                    const hp = 2 + wave + Math.floor(Math.random() * 2);
+                    enemies.push({
+                        x: ex, y: ey, size: 34 + Math.random() * 8,
+                        hp: hp, maxHp: hp,
+                        speed: 1.35 + (wave * 0.11) + Math.random() * 0.45,
+                        isBoss: false,
+                        wobble: Math.random() * Math.PI * 2,
+                        hatColor: ['#e6b94f', '#e58b62', '#a68bd4', '#72a9a0'][Math.floor(Math.random()*4)]
+                    });
+                }
+            }
+        }
+
+        function update(time) {
+            if (gameOver) return;
+
+            // Keyboard + mobile joystick movement, normalized diagonals.
+            let mx = joy.x, my = joy.y;
+            if (keys['a'] || keys['arrowleft']) mx -= 1;
+            if (keys['d'] || keys['arrowright']) mx += 1;
+            if (keys['w'] || keys['arrowup']) my -= 1;
+            if (keys['s'] || keys['arrowdown']) my += 1;
+            const mag = Math.hypot(mx, my);
+            if (mag > 1) { mx /= mag; my /= mag; }
+            player.x = Math.max(player.size/2, Math.min(canvas.width-player.size/2, player.x + mx*player.speed));
+            player.y = Math.max(player.size/2, Math.min(canvas.height-player.size/2, player.y + my*player.speed));
+            if (firing && time - lastShot > 190) { shoot(); lastShot = time; }
+
+            // Spawning
+            if (time - lastSpawn > spawnRate) {
+                spawnEnemy();
+                lastSpawn = time;
+                spawnRate = Math.max(650, 1750 - (wave * 65)); // Farm chaos accelerates!
+            }
+
+            // Wave progression
+            if(kills > wave * 15 && !bossSpawned) {
+                wave++;
+                document.getElementById('waveDisplay').innerText = wave;
+            }
+
+            // Bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                if (b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                let angle = Math.atan2(player.y - e.y, player.x - e.x);
+                e.x += Math.cos(angle) * e.speed;
+                e.y += Math.sin(angle) * e.speed + (e.isBoss ? 0 : Math.sin(time/130 + (e.wobble || 0)) * 0.45);
+
+                // Collision with player
+                let dist = Math.hypot(player.x - e.x, player.y - e.y);
+                if (dist < (player.size/2 + e.size/2 - 10)) {
+                    gameOver = true;
+                    document.getElementById('gameover').style.display = 'block';
+                }
+
+                // Collision with bullets (Milk)
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    let b = bullets[j];
+                    let bDist = Math.hypot(b.x - e.x, b.y - e.y);
+                    if (bDist < e.size/2 + b.size) {
+                        e.hp--;
+                        bullets.splice(j, 1);
+                        
+                        // Confetti-like cream puffs: no blood or grim effects.
+                        for(let k=0; k<9; k++) {
+                            particles.push({
+                                x: e.x, y: e.y,
+                                vx: (Math.random()-0.5)*7, vy: (Math.random()-0.5)*7,
+                                life: 25
+                            });
+                        }
+
+                        if (e.hp <= 0) {
+                            enemies.splice(i, 1);
+                            kills++;
+                            document.getElementById('killDisplay').innerText = kills;
+                            
+                            // Level up every 10 kills
+                            if (kills % 10 === 0) {
+                                level++;
+                                document.getElementById('levelDisplay').innerText = level;
+                            }
+
+                            if (e.isBoss) {
+                                bossSpawned = false;
+                                wave++;
+                                document.getElementById('waveDisplay').innerText = wave;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Particles update
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Soft farm-field dots for a little visual personality.
+            ctx.fillStyle = 'rgba(255,255,255,.13)';
+            for (let gx = 24; gx < canvas.width; gx += 72) {
+                for (let gy = 28; gy < canvas.height; gy += 72) {
+                    ctx.beginPath(); ctx.arc(gx, gy, 2, 0, Math.PI*2); ctx.fill();
+                }
+            }
+
+            // Particles
+            ctx.fillStyle = '#fff4cf';
+            for (let p of particles) {
+                ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
+            }
+
+            // Cream-puff projectiles.
+            for (let b of bullets) {
+                ctx.save();
+                ctx.shadowColor = '#fffdf0'; ctx.shadowBlur = 18;
+                ctx.fillStyle = '#fffdf0';
+                ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI*2); ctx.fill();
+                ctx.shadowBlur = 0;
+                ctx.fillStyle = '#e9f7ff';
+                ctx.beginPath(); ctx.arc(b.x-3, b.y-3, b.size*.52, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#f3d28c';
+                ctx.beginPath(); ctx.arc(b.x+3, b.y+3, 3, 0, Math.PI*2); ctx.fill();
+                ctx.restore();
+            }
+
+            // Enemies
+            for (let e of enemies) {
+                if(e.isBoss) {
+                    drawBoss(e.x, e.y, e.size);
+                    // Boss HP bar
+                    ctx.fillStyle = '#d98562';
+                    ctx.fillRect(e.x - e.size/2, e.y - e.size/2 - 70, e.size, 10);
+                    ctx.fillStyle = '#f2c75c';
+                    ctx.fillRect(e.x - e.size/2, e.y - e.size/2 - 70, e.size * (e.hp/e.maxHp), 10);
+                } else {
+                    drawFarmer(e.x, e.y, e.size, e.hatColor);
+                    // Every farmer gets a visible health bar.
+                    const bw = e.size * 1.05, bh = 6;
+                    const bx = e.x - bw/2, by = e.y - e.size*.72;
+                    ctx.fillStyle = 'rgba(49,45,40,.8)';
+                    ctx.beginPath(); ctx.roundRect(bx-1, by-1, bw+2, bh+2, 4); ctx.fill();
+                    ctx.fillStyle = '#d98562';
+                    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill();
+                    ctx.fillStyle = '#a8d66d';
+                    ctx.beginPath(); ctx.roundRect(bx, by, bw * Math.max(0, e.hp/e.maxHp), bh, 3); ctx.fill();
+                }
+            }
+
+            // Player
+            if (!gameOver) {
+                drawCow(player.x, player.y, player.size);
+            }
+        }
+
+        function loop(time) {
+            update(time);
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
