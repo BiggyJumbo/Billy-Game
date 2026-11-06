@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billy's Big Farm Scramble</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #183b35;
+            color: white;
+            font-family: 'Trebuchet MS', Arial, sans-serif;
+            text-align: center;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        canvas {
+            background: #8fca78;
+            display: block;
+            margin: 0 auto;
+            image-rendering: auto;
+        }
+        #ui {
+            top: max(12px, env(safe-area-inset-top));
+            left: 14px;
+            font: 800 15px/1.55 'Trebuchet MS', Arial, sans-serif;
+            letter-spacing: 1px;
+            color: #fff9df;
+            text-shadow: 2px 2px 0 #315344;
+            background: rgba(28, 67, 55, .72);
+            border: 2px solid rgba(255,255,255,.45);
+            border-radius: 14px;
+            padding: 9px 13px;
+        }
+        #gameTitle {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            color: #fff9df; font-weight: 900; font-size: 17px;
+            letter-spacing: 2px; text-shadow: 2px 2px #315344;
+            pointer-events: none; white-space: nowrap;
+        }
+        #mobileControls { display: none; }
+        .control-label {
+            color: white; font: 800 10px Arial, sans-serif; letter-spacing: 1px;
+            text-shadow: 1px 2px 2px #183b35; margin-top: 7px;
+        }
+        #stickBase {
+            position: absolute; left: 22px; bottom: max(24px, env(safe-area-inset-bottom));
+            width: 124px; height: 124px; border-radius: 50%;
+            background: rgba(31, 75, 61, .48); border: 3px solid rgba(255,255,255,.65);
+            box-shadow: inset 0 0 0 5px rgba(255,255,255,.10);
+            touch-action: none;
+        }
+        #stickKnob {
+            position: absolute; width: 54px; height: 54px; left: 32px; top: 32px;
+            border-radius: 50%; background: #fff3c4; border: 3px solid #527c54;
+            box-shadow: 0 3px 0 rgba(0,0,0,.2); pointer-events: none;
+        }
+        #fireButton {
+            position: absolute; right: 24px; bottom: max(38px, env(safe-area-inset-bottom));
+            width: 92px; height: 92px; border-radius: 50%;
+            border: 4px solid #fff4d2; background: #ef8b52; color: white;
+            font: 900 15px 'Trebuchet MS', Arial, sans-serif; letter-spacing: 1px;
+            box-shadow: 0 6px 0 #a94f3c, 0 8px 16px rgba(0,0,0,.25);
+            touch-action: none;
+        }
+        #fireButton:active { transform: translateY(4px); box-shadow: 0 2px 0 #a94f3c; }
+        @media (pointer: coarse), (max-width: 800px) {
+            #mobileControls { display: block; }
+            #ui { font-size: 12px; padding: 7px 10px; }
+            #gameTitle { top: 13px; font-size: 14px; }
+        }
+        #ui {
+            position: absolute; text-align: left; pointer-events: none;
+        }
+        #gameover {
+            position: absolute; z-index: 5; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); display: none; cursor: pointer;
+            color: #fff9df; background: rgba(28,67,55,.94);
+            border: 4px solid #fff4d2; border-radius: 22px;
+            padding: 24px 30px; font-size: clamp(28px, 7vw, 48px);
+            font-weight: 900; box-shadow: 0 12px 30px rgba(0,0,0,.3);
+            white-space: nowrap;
+        }
+
+        @keyframes sloppy {
+            0% { transform: rotate(-4deg) translate(0,0); }
+            25% { transform: rotate(2deg) translate(2px,-1px); }
+            50% { transform: rotate(-2deg) translate(-2px,2px); }
+            75% { transform: rotate(4deg) translate(1px,1px); }
+            100% { transform: rotate(-4deg) translate(0,0); }
+        }
+        #ui {
+            color: #111 !important; text-shadow: 2px 2px 0 #fff !important;
+            font-family: 'Comic Sans MS', 'Chalkboard SE', cursive !important;
+            border: 4px dashed #ff00aa !important; border-radius: 4px !important;
+            background-size: 100% 100% !important; image-rendering: pixelated;
+            animation: sloppy .9s steps(4) infinite; transform-origin: left top;
+        }
+        #lvl { position:absolute; z-index:8; top:50%; left:50%; transform:translate(-50%,-50%); display:none;
+            width:min(92vw,420px); background:rgba(20,10,40,.96); border:4px dashed #ff00aa; border-radius:10px;
+            padding:16px; font-family:'Comic Sans MS',cursive; }
+        #lvl h2 { margin:0 0 10px; font-size:26px; color:#fff176; text-shadow:3px 3px #c20bff; }
+        #lvl button { display:block; width:100%; margin:8px 0; padding:12px; font:900 17px 'Comic Sans MS',cursive;
+            border:3px solid #fff; border-radius:8px; color:#111; cursor:pointer;
+            background:linear-gradient(90deg,#ff4d6d,#ffd23f,#4dff88,#4dc3ff,#c20bff); }
+        #lvl small { display:block; font-weight:400; font-size:12px; }
+        #start, #cut { position:fixed; inset:0; z-index:11; display:flex; flex-direction:column; align-items:center;
+            justify-content:center; background-size:100% 100%; image-rendering:pixelated; text-align:center; padding:16px;
+            font-family:'Comic Sans MS',cursive; overflow:hidden; }
+        #cut { z-index:10; display:none; justify-content:space-between; }
+        #stTitle { font:900 clamp(34px,10vw,64px)/1 Impact,'Arial Black',sans-serif; margin:0 0 14px; background:linear-gradient(90deg,#ff4d6d,#ffd23f,#4dff88,#4dc3ff,#c20bff,#ff4d6d);
+            background-size:200% 100%; -webkit-background-clip:text; background-clip:text; color:transparent; -webkit-text-stroke:2px #1a0a2e;
+            animation:rb 1s linear infinite, sloppy .9s steps(4) infinite; }
+        @keyframes rb { to { background-position:200% 0; } }
+        @keyframes bob { 50% { transform:translateY(-10px) rotate(6deg); } }
+        .bigbtn { display:block; width:min(86vw,360px); margin:8px auto; padding:14px; font:900 20px 'Comic Sans MS',cursive; border:4px dashed #fff;
+            border-radius:10px; color:#111; cursor:pointer; background:linear-gradient(90deg,#ff4d6d,#ffd23f,#4dff88,#4dc3ff,#c20bff); }
+        #stSprites { display:flex; gap:6px; align-items:flex-end; justify-content:center; margin:6px 0 14px; }
+        #stSprites img, #cutStage img { width:min(20vw,96px); animation:bob .5s steps(2) infinite; }
+        #cutStage { flex:1; display:flex; align-items:center; justify-content:center; gap:10px; width:100%; }
+        #cutStage img { width:min(38vw,200px); }
+        #cutText { background:#fffbe8; color:#111; border:5px solid #111; border-radius:10px; padding:14px; text-align:left;
+            font:700 clamp(15px,4.4vw,20px)/1.35 'Comic Sans MS',cursive; width:min(94vw,520px); min-height:110px; box-shadow:6px 6px 0 #ff00aa; }
+        #cutTap { margin:10px 0 max(10px,env(safe-area-inset-bottom)); font:900 16px 'Comic Sans MS',cursive; color:#fff; text-shadow:2px 2px #000; animation:bob .6s steps(2) infinite; }
+        .sticker { position:absolute; width:48px; height:48px; image-rendering:pixelated; border:2px solid #fff; animation:sloppy 1.1s steps(4) infinite; opacity:.9; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        WAVE: <span id="waveDisplay">1</span><br>
+        LEVEL: <span id="levelDisplay">1</span><br>
+        KILLS: <span id="killDisplay">0</span><br>
+        MOO-HP: <span id="hpDisplay"></span>
+    </div>
+    <div id="gameTitle">BILLY'S EXTREMELY NORMAL MILK EMERGENCY</div>
+    <div id="gameover" onclick="location.reload()">
+        YOU GOT FARMED.<br>
+        <span style="font-size:17px; color:#fff4d2">The farmers have unionized. Tap to try again.</span>
+    </div>
+    <div id="mobileControls">
+        <div id="stickBase"><div id="stickKnob"></div></div>
+        <button id="fireButton" type="button">MILK!!!</button>
+        <div class="control-label" style="position:absolute;left:43px;bottom:max(7px, env(safe-area-inset-bottom))">MOVE</div>
+        <div class="control-label" style="position:absolute;right:43px;bottom:max(17px, env(safe-area-inset-bottom))">FIRE</div>
+    </div>
+    <div id="start"><h1 id="stTitle">BILLY'S BIG<br>FARM SCRAMBLE</h1><div id="stSprites"></div>
+        <button class="bigbtn" id="btnStory">▶ STORY MODE</button>
+        <button class="bigbtn" id="btnEndless">ENDLESS MOO MODE</button>
+        <div style="color:#fff;text-shadow:2px 2px #000;font-weight:900;margin-top:8px">WASD / STICK TO MOVE · AUTO-FIRES MILK</div></div>
+    <div id="cut"><div id="cutStage"></div><div id="cutText"></div><div id="cutTap">TAP ▶</div></div>
+    <div id="lvl"></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+
+        // Game State
+        let wave = 1;
+        let level = 1;
+        let kills = 0;
+        let gameOver = false;
+        let bossSpawned = false;
+        let spawnRate = 2000;
+        let lastSpawn = 0;
+        let keys = {};
+        let mouse = { x: canvas.width/2, y: canvas.height/2 };
+        let joy = { x: 0, y: 0, active: false, pointerId: null };
+        let firing = false;
+        let lastShot = 0;
+        const stickBase = document.getElementById('stickBase');
+        const stickKnob = document.getElementById('stickKnob');
+        const fireButton = document.getElementById('fireButton');
+
+        window.addEventListener('keydown', e => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.code === 'Space') { e.preventDefault(); shoot(); }
+        });
+        window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+        window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+        window.addEventListener('mousedown', e => { if (e.target === canvas) shoot(); });
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        });
+
+        // Touch joystick: drag the knob in any direction to move.
+        function moveStick(e) {
+            const r = stickBase.getBoundingClientRect();
+            const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+            let dx = e.clientX - cx, dy = e.clientY - cy;
+            const max = 36, len = Math.hypot(dx, dy);
+            if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+            joy.x = dx / max; joy.y = dy / max;
+            stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+        stickBase.addEventListener('pointerdown', e => {
+            e.preventDefault(); joy.active = true; joy.pointerId = e.pointerId;
+            stickBase.setPointerCapture(e.pointerId); moveStick(e);
+        });
+        stickBase.addEventListener('pointermove', e => {
+            if (joy.active && e.pointerId === joy.pointerId) moveStick(e);
+        });
+        function releaseStick(e) {
+            if (e.pointerId !== joy.pointerId) return;
+            joy.active = false; joy.x = 0; joy.y = 0; joy.pointerId = null;
+            stickKnob.style.transform = 'translate(0, 0)';
+        }
+        stickBase.addEventListener('pointerup', releaseStick);
+        stickBase.addEventListener('pointercancel', releaseStick);
+        fireButton.addEventListener('pointerdown', e => {
+            e.preventDefault(); firing = true; shoot(); fireButton.setPointerCapture(e.pointerId);
+        });
+        fireButton.addEventListener('pointerup', () => firing = false);
+        fireButton.addEventListener('pointercancel', () => firing = false);
+        fireButton.addEventListener('lostpointercapture', () => firing = false);
+
+        // Entities
+        const WORLD_W = 3200, WORLD_H = 3200, FARM_K = 4;
+        const MAPS = [
+            { name: 'THE BORING FARM', lvl: 1, skin: '#f0c090', hats: ['#e6b94f', '#e58b62', '#a68bd4', '#72a9a0'],
+              say: ['MY TURNIPS!', 'HEE HAW', 'UNION BREAK', 'MOO?? NO', 'I HATE MILK', 'WHO PUT A COW', 'SPICY CORN', 'BORK BORK'],
+              pal: { grass: '#6fb04a', ta: '#7cc156', tb: '#5c9a3c', f1: '#3f8a2a', f2: '#8bcf4f', f3: '#d9b348', f4: '#f0d572', path: '#c9a36a', pathd: '#b08450', w1: '#8fd0f5', w2: '#3d8fd1', barn: '#c0382b', roof: '#7b241c', tree: '#2f7d32', trunk: '#6b4226', hay: '#e8c547' } },
+            { name: 'HAUNTED PUMPKIN PATCH', lvl: 4, skin: '#ff8a1f', hats: ['#ff7a1a', '#222222', '#7b2ff7', '#9aff5a'],
+              say: ['BOO!', 'MY PUMPKIN!', 'I AM SPOOKY', 'WOOOOO', 'TRICK OR TREAT'],
+              pal: { grass: '#3b2a5a', ta: '#4b3873', tb: '#2c1f45', f1: '#ff7a1a', f2: '#2d5a1e', f3: '#ff9d3d', f4: '#2d5a1e', path: '#5a4a3a', pathd: '#3e3226', w1: '#6a3fa0', w2: '#35155f', barn: '#4a1f6b', roof: '#1f0d33', tree: '#1d3a2b', trunk: '#3a2a1a', hay: '#ff9d3d' } },
+            { name: 'CHEESE MOON', lvl: 8, skin: '#ffe27a', hats: ['#ffffff', '#c9c9d8', '#ffd84d', '#7fb3e6'],
+              say: ['CHEESE!', 'NO AIR', 'MOON MOO', 'GOUDA GRIEF', 'I MISS EARTH'],
+              pal: { grass: '#d8d3c0', ta: '#e8e3d0', tb: '#bdb8a2', f1: '#ffd84d', f2: '#e6b800', f3: '#fff0a0', f4: '#d4a900', path: '#a8a38f', pathd: '#8f8a77', w1: '#c9e7ff', w2: '#7fb3e6', barn: '#ffd84d', roof: '#c79a00', tree: '#9a95a8', trunk: '#7d7a6a', hay: '#fff0a0' } },
+            { name: 'DISCO DAIRY DIMENSION', lvl: 12, skin: '#ff66cc', hats: ['#ff00aa', '#00e5ff', '#ffe600', '#7cff00'],
+              say: ['DISCO!', 'NO LEFT FEET', 'FUNKY MOO', 'BOOGIE TIME', 'DANCE FIGHT'],
+              pal: { grass: '#1a0a3a', ta: '#ff00aa', tb: '#00e5ff', f1: '#ff00aa', f2: '#00e5ff', f3: '#ffe600', f4: '#7cff00', path: '#8a2be2', pathd: '#ff00aa', w1: '#ffe600', w2: '#ff00aa', barn: '#00e5ff', roof: '#ff00aa', tree: '#7cff00', trunk: '#ffe600', hay: '#ff00aa' } }
+        ];
+        let mapIdx = 0;
+        const cam = { x: WORLD_W / 2 - canvas.width / 2, y: WORLD_H / 2 - canvas.height / 2 };
+        const player = { x: WORLD_W / 2, y: WORLD_H / 2, size: 40, speed: 5, hp: 5, maxHp: 5, inv: 0,
+            shots: 1, dmg: 1, bsize: 1, fireInt: 190, magnet: 0, xpMul: 1 };
+
+
+        // ===== BILLY DRAMA =====
+        let shake = 0, flash = 0;
+        const popups = [];
+        const BILLY_LINES = ['BILLY!!!', 'BILLLLYYYY!!!', 'NOOOO BILLY!!!', 'BILLYYYYYY!!!', 'WHY BILLY?!', 'BIIILLLYYY!!!'];
+        function sayBilly(boss) {
+            try {
+                if (!('speechSynthesis' in window) || speechSynthesis.speaking) return;
+                const u = new SpeechSynthesisUtterance(boss ? 'Biiiilllllyyyy!' : 'Billy!');
+                u.rate = boss ? 0.4 : 0.55; u.pitch = 0.2; u.volume = 1;
+                speechSynthesis.speak(u);
+            } catch (e) {}
+        }
+        function onKill(e) {
+            const boss = e.isBoss; burstEmo(e);
+            popups.push({
+                x: e.x, y: e.y - 20,
+                text: boss ? 'BIIIIIILLLLLYYYYYYY!!!!' : BILLY_LINES[Math.floor(Math.random() * BILLY_LINES.length)],
+                life: boss ? 110 : 70, max: boss ? 110 : 70,
+                rot: (Math.random() - 0.5) * 0.5, boss: boss
+            });
+            shake = boss ? 30 : 12; flash = boss ? 1 : 0.35;
+            for (let k = 0; k < (boss ? 60 : 24); k++) {
+                particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*16, vy: (Math.random()-0.5)*16, life: 40, h: Math.random()*360 });
+            }
+            sayBilly(boss);
+        }
+        // =======================
+
+
+        // ===== CRAPPY PNG ASSETS =====
+        function crappify(c) {
+            const x = c.getContext('2d');
+            const d = x.getImageData(0, 0, c.width, c.height);
+            for (let i = 0; i < d.data.length; i += 4) {
+                if (d.data[i + 3] > 0) {
+                    const n = (Math.random() - .5) * 60;
+                    d.data[i] += n; d.data[i + 1] += n; d.data[i + 2] += n;
+                }
+            }
+            x.putImageData(d, 0, 0);
+        }
+        function pix(map, pal) {
+            const w = Math.max(...map.map(r => r.length));
+            const c = document.createElement('canvas'); c.width = w; c.height = map.length;
+            const x = c.getContext('2d');
+            map.forEach((row, j) => row.padEnd(w, '.').split('').forEach((ch, i) => {
+                if (pal[ch]) { x.fillStyle = pal[ch]; x.fillRect(i, j, 1, 1); }
+            }));
+            crappify(c);
+            const im = new Image(); im.src = c.toDataURL('image/png');
+            return im;
+        }
+        const COW_MAP = [
+            "..hh........hh..", "..hh........hh..", "...wwwwwwwwww...", "..wwwwwwwwwwww..",
+            ".wwwkwwwwwwkwww.", ".wwwwwwwwwwwwww.", ".wwkkwwwwwwwwww.", "..wwpppppppppww.",
+            "..wwpkppppkppww.", "...wwpppppppww..", "....wwwwwwwww...", "...wwwwwwwwwww..",
+            "..wwkkwwwwwwwwk.", "..wwkkwwwwwwwww.", "...ww......ww...", "...kk......kk..."];
+        const FARMER_MAP = [
+            "....yyyyyyyy....", "...yyyyyyyyyy...", "..yyyyyyyyyyyy..", "...ssssssssss...",
+            "..sskssssskssss.", "..sssssrrsssss..", "..smmmmmmmmmms..", "...sswwwwwsss...",
+            "....ssssssss....", "...bbbbbbbbbb...", ".sbbbyybbyybbbs.", ".sbbbbbbbbbbbbs.",
+            "..bbbbbbbbbbbb..", "...bbb....bbb...", "...bbb....bbb...", "..nnnn....nnnn.."];
+        const cowImg = pix(COW_MAP, { w: '#fdfdf5', k: '#222', h: '#e8c36a', p: '#f2a0b0' });
+        const farmerImgs = {};
+        function getFarmerImg(hat) {
+            const key = hat + MAPS[mapIdx].skin;
+            return farmerImgs[key] || (farmerImgs[key] = pix(FARMER_MAP,
+                { y: hat, s: MAPS[mapIdx].skin, k: '#111', r: '#d9534f', m: '#6b3e1a', w: '#fff', b: '#3b6fc9', n: '#5a3a1a' }));
+        }
+        const splatImg = (function () {
+            const S = 20, c = document.createElement('canvas'); c.width = c.height = S;
+            const x = c.getContext('2d'); let sd = 3;
+            const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+            for (let j = 0; j < S; j++) for (let i = 0; i < S; i++) {
+                const dx = i - S / 2 + .5, dy = j - S / 2 + .5;
+                const a = Math.atan2(dy, dx), d = Math.hypot(dx, dy);
+                const edge = 5.5 + 2 * Math.sin(a * 5) + 1.5 * Math.sin(a * 3 + 1);
+                if (d < edge) { x.fillStyle = d > edge - 1.5 ? '#bfe0ff' : '#ffffff'; x.fillRect(i, j, 1, 1); }
+                else if (d < 9.5 && r() < .07) { x.fillStyle = '#fff'; x.fillRect(i, j, 1, 1); }
+            }
+            crappify(c);
+            const im = new Image(); im.src = c.toDataURL('image/png'); return im;
+        })();
+        function spr(img, w, h, glow) {
+            if (img.complete && img.naturalWidth) {
+                ctx.imageSmoothingEnabled = true;
+                if (glow) { ctx.shadowColor = glow; ctx.shadowBlur = 12; ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.shadowBlur = 0; }
+                ctx.drawImage(img, -w / 2, -h / 2, w, h); }
+        }
+
+        // ===== FARM MAP =====
+        const farmBG = document.createElement('canvas');
+        function buildFarm() {
+            const P = MAPS[mapIdx].pal;
+            const K = FARM_K, w = Math.ceil(WORLD_W / K), h = Math.ceil(WORLD_H / K);
+            farmBG.width = w; farmBG.height = h;
+            const f = farmBG.getContext('2d');
+            let seed = 7 + mapIdx * 13; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+            f.fillStyle = P.grass; f.fillRect(0, 0, w, h);
+            for (let i = 0; i < w * h / 30; i++) { f.fillStyle = rnd() < .5 ? P.ta : P.tb; f.fillRect(rnd() * w | 0, rnd() * h | 0, 2, 1); }
+            f.fillStyle = P.path; f.fillRect(0, h * .56 | 0, w, h * .08 | 0);
+            for (let i = 0; i < w * 2; i++) { f.fillStyle = P.pathd; f.fillRect(rnd() * w | 0, (h * .56 + rnd() * h * .08) | 0, 1, 1); }
+            const field = (x0, y0, x1, y1, a, b) => { for (let y = y0 | 0; y < y1; y += 3) { f.fillStyle = ((y / 3 | 0) % 2) ? a : b; f.fillRect(x0 | 0, y, (x1 - x0) | 0, 2); } };
+            field(w * .52, h * .08, w * .95, h * .32, P.f1, P.f2);
+            field(w * .05, h * .76, w * .5, h * .92, P.f3, P.f4);
+            for (let i = 0; i < 6; i++) { const fx = rnd() * w * .8, fy = rnd() * h * .8; field(fx, fy, fx + 60 + rnd() * 60, fy + 30 + rnd() * 30, rnd() < .5 ? P.f1 : P.f3, rnd() < .5 ? P.f2 : P.f4); }
+            const pond = (px, py, rx, ry) => { f.fillStyle = P.w1; f.beginPath(); f.ellipse(px, py, rx, ry, 0, 0, 7); f.fill(); f.fillStyle = P.w2; f.beginPath(); f.ellipse(px, py, rx * .8, ry * .7, 0, 0, 7); f.fill(); };
+            pond(w * .74, h * .76, w * .2, h * .06);
+            for (let i = 0; i < 4; i++) pond(rnd() * w, rnd() * h, 18, 9);
+            const barn = (bx, by, bw) => { const bh = bw * .75 | 0; f.fillStyle = P.barn; f.fillRect(bx, by, bw, bh); f.fillStyle = P.roof; f.beginPath(); f.moveTo(bx - 3, by); f.lineTo(bx + bw / 2, by - bh * .5); f.lineTo(bx + bw + 3, by); f.fill();
+                f.fillStyle = '#fff'; f.fillRect(bx + bw * .3, by + bh * .35, bw * .4, bh * .65); f.strokeStyle = P.barn; f.beginPath(); f.moveTo(bx + bw * .3, by + bh * .35); f.lineTo(bx + bw * .7, by + bh); f.moveTo(bx + bw * .7, by + bh * .35); f.lineTo(bx + bw * .3, by + bh); f.stroke(); };
+            barn(w * .06 | 0, h * .12 | 0, 46);
+            for (let i = 0; i < 3; i++) barn(rnd() * w * .9 | 0, h * .15 + rnd() * h * .6 | 0, 30 + rnd() * 16 | 0);
+            for (let i = 0; i < 21; i++) { const hx = rnd() * w | 0, hy = rnd() * h | 0; f.fillStyle = P.hay; f.beginPath(); f.arc(hx, hy, 3, 0, 7); f.fill(); f.fillStyle = 'rgba(0,0,0,.25)'; f.fillRect(hx - 3, hy, 6, 1); }
+            for (let i = 0; i < 50; i++) { const tx = rnd() * w | 0, ty = rnd() * h | 0; f.fillStyle = P.trunk; f.fillRect(tx, ty + 3, 2, 4); f.fillStyle = P.tree; f.beginPath(); f.arc(tx + 1, ty, 4, 0, 7); f.fill(); }
+            if (mapIdx === 3) for (let i = 0; i < w * h / 40; i++) { f.fillStyle = `hsl(${rnd() * 360},100%,60%)`; f.fillRect(rnd() * w | 0, rnd() * h | 0, 1, 1); }
+            f.fillStyle = P.trunk;
+            for (const fy of [h - 7, h * .02 | 0]) { f.fillRect(0, fy + 2, w, 1); for (let x = 0; x < w; x += 6) f.fillRect(x, fy, 1, 5); }
+            for (const fx of [0, w - 1]) { f.fillRect(fx, 0, 1, h); for (let y = 0; y < h; y += 6) f.fillRect(fx - 1, y, 3, 1); }
+        }
+        buildFarm();
+        
+
+        // sloppy rainbow scoreboard background (a tiny crappy PNG)
+        (function () {
+            const c = document.createElement('canvas'); c.width = 24; c.height = 16;
+            const x = c.getContext('2d');
+            for (let j = 0; j < 16; j++) { x.fillStyle = `hsl(${j * 24},100%,60%)`; x.fillRect(0, j, 24, 1); }
+            for (let n = 0; n < 80; n++) { x.fillStyle = `hsl(${Math.random() * 360},100%,${40 + Math.random() * 40}%)`; x.fillRect(Math.random() * 24 | 0, Math.random() * 16 | 0, 1 + Math.random() * 3 | 0, 1); }
+            document.getElementById('ui').style.backgroundImage = `url(${c.toDataURL('image/png')})`;
+        })();
+        // ===========================
+
+
+        // ===== POWER-UPS, XP, HP =====
+        const pu = { rapid: 0, shield: 0, speed: 0, mega: 0, freeze: 0, star: 0 };
+        const pickups = [], rings = [];
+        let paused = true, xp = 0, xpNeed = 12;
+        const PUS = [
+            { k: 'rapid', icon: '🌈', name: 'RAINBOW UDDER', color: '#ff4dd8', dur: 480 },
+            { k: 'shield', icon: '🛡️', name: 'BUBBLE MOO', color: '#6ee7ff', dur: 420 },
+            { k: 'speed', icon: '👟', name: 'ZOOMY HOOVES', color: '#ffe14f', dur: 480 },
+            { k: 'mega', icon: '💥', name: 'MEGA SPLAT', color: '#ff8a3d', dur: 420 },
+            { k: 'nova', icon: '💨', name: 'BEAN BLAST', color: '#9aff5a', dur: 0 },
+            { k: 'heal', icon: '🥧', name: 'SUSPICIOUS PIE', color: '#ffb36b', dur: 0 },
+            { k: 'freeze', icon: '🧊', name: 'COLD MOO-LK', color: '#aaeeff', dur: 240, rare: 1 },
+            { k: 'star', icon: '⭐', name: 'MOO-STAR', color: '#ffe14f', dur: 360, rare: 2 },
+            { k: 'disco', icon: '🪩', name: 'DISCO FEVER', color: '#ff66ff', dur: 0, rare: 3 }
+        ];
+        const SAYINGS = ['MY TURNIPS!', 'HEE HAW', 'UNION BREAK', 'MOO?? NO', 'I HATE MILK', 'WHO PUT A COW', 'SPICY CORN', 'BORK BORK'];
+        const UPG = [
+            { n: 'MORE MOO 🐄', d: '+1 splat per shot', f: () => player.shots = Math.min(player.shots + 1, 8) },
+            { n: 'SPICY UDDER 🔥', d: 'shoot way faster', f: () => player.fireInt *= 0.8 },
+            { n: 'LEG DAY 🦵', d: 'run faster', f: () => player.speed += 0.8 },
+            { n: 'CHONKY SPLATS 🥛', d: 'bigger + stronger splats', f: () => { player.bsize *= 1.25; player.dmg += 1; } },
+            { n: 'EXTRA MOO-LIVES ❤️', d: '+1 max HP and full heal', f: () => { player.maxHp++; player.hp = player.maxHp; updateHp(); } },
+            { n: 'MAGNET UDDER 🧲', d: 'suck up power-ups from afar', f: () => player.magnet += 120 },
+            { n: 'BIG BRAIN 🧠', d: '+40% XP', f: () => player.xpMul *= 1.4 }
+        ];
+        function updateHp() { document.getElementById('hpDisplay').innerText = '♥'.repeat(Math.max(0, player.hp)) + '♡'.repeat(Math.max(0, player.maxHp - player.hp)); }
+        updateHp();
+        function say(text, x, y) { popups.push({ x, y, text, life: 60, max: 60, rot: (Math.random() - .5) * .4, boss: false }); }
+        function applyPU(t) {
+            boop(500, 1300, .18, 'square');
+            say(t.name + '!!!', player.x, player.y - 40);
+            if (t.k === 'nova') {
+                rings.push({ x: player.x, y: player.y, r: 10, life: 30 });
+                for (const e of enemies) {
+                    if (Math.hypot(e.x - player.x, e.y - player.y) < 420) {
+                        e.hp -= 6 + level; const a = Math.atan2(e.y - player.y, e.x - player.x);
+                        e.x += Math.cos(a) * 80; e.y += Math.sin(a) * 80;
+                    }
+                }
+                shake = 25; flash = .5;
+            } else if (t.k === 'heal') { player.hp = Math.min(player.maxHp, player.hp + 2); updateHp(); }
+            else if (t.k === 'disco') { pu.rapid = pu.mega = pu.speed = pu.shield = 360; }
+            else pu[t.k] = t.dur;
+        }
+        function pickPU() {
+            const rares = PUS.filter(t => t.rare && t.rare <= mapIdx), com = PUS.filter(t => !t.rare);
+            const pool = rares.length && Math.random() < .3 ? rares : com;
+            return pool[Math.floor(Math.random() * pool.length)];
+        }
+        function dropLoot(e) {
+            const n = e.isBoss ? 3 : (Math.random() < 0.14 ? 1 : 0);
+            for (let i = 0; i < n; i++) pickups.push({ x: e.x + (Math.random() - .5) * 60, y: e.y + (Math.random() - .5) * 60, t: pickPU(), life: 900 });
+        }
+        function updatePickups() {
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const p = pickups[i]; p.life--;
+                const d = Math.hypot(p.x - player.x, p.y - player.y);
+                if (d < 140 + player.magnet) { p.x += (player.x - p.x) * 0.08; p.y += (player.y - p.y) * 0.08; }
+                if (d < 36) { applyPU(p.t); pickups.splice(i, 1); } else if (p.life <= 0) pickups.splice(i, 1);
+            }
+            for (let i = rings.length - 1; i >= 0; i--) { rings[i].r += 14; if (--rings[i].life <= 0) rings.splice(i, 1); }
+        }
+        function hurt(e, ang) {
+            e.x -= Math.cos(ang) * 60; e.y -= Math.sin(ang) * 60;
+            if (pu.star > 0) e.hp -= 4;
+            if (player.inv > 0 || pu.shield > 0 || pu.star > 0) return;
+            player.hp--; boop(220, 50, .4, 'square'); player.inv = 80; shake = 22; flash = .4; updateHp();
+            say('MOOOOO!!', player.x, player.y - 40);
+            if (player.hp <= 0) { gameOver = true; document.getElementById('gameover').style.display = 'block'; }
+        }
+        function registerKill(e) {
+            kills++; document.getElementById('killDisplay').innerText = kills; combo(); boop(260 + Math.random() * 80, 90, .35);
+            onKill(e); gainXp(e.isBoss ? 40 : 3 + Math.floor(wave / 2)); dropLoot(e);
+            if (e.isBoss) { bossSpawned = false; wave++; document.getElementById('waveDisplay').innerText = wave; }
+            if (e.isFinal) playEnding();
+        }
+        function gainXp(n) {
+            xp += n * player.xpMul;
+            if (!paused && !gameOver && xp >= xpNeed) {
+                xp -= xpNeed; xpNeed = Math.round(xpNeed * 1.15 + 3); level++;
+                document.getElementById('levelDisplay').innerText = level; openMenu();
+            }
+        }
+        function openMenu() {
+            paused = true; firing = false;
+            const box = document.getElementById('lvl');
+            box.innerHTML = '<h2>LEVEL UP!! MOOOO!!</h2>';
+            UPG.slice().sort(() => Math.random() - .5).slice(0, 3).forEach(u => {
+                const b = document.createElement('button');
+                b.innerHTML = u.n + '<small>' + u.d + '</small>';
+                b.onclick = () => { u.f(); box.style.display = 'none'; if (!checkUnlock()) { paused = false; gainXp(0); } };
+                box.appendChild(b);
+            });
+            box.style.display = 'block';
+        }
+
+
+        // ===== STORY MODE, CUTSCENES, START SCREEN =====
+        let storyMode = true, finalSpawned = false;
+        const chickenImg = pix(["......rr........", ".....rrrr.......", ".....wwwww......", "....wwkwwoo.....", "....wwwwwoo.....", ".....wwwwwr.....",
+            "....wwwwwww.....", "...wwwwwwwww....", "..wwwwwwwwwww...", "..wwwwwwwwwww...", "...wwwwwwwww....", "....wwwwwww.....", ".....oo..oo.....", ".....o...o......", "....ooo.ooo....."],
+            { w: '#fff', k: '#111', o: '#ff9a1f', r: '#e11' });
+        const rbCache = {};
+        function rainbowPng(shift) {
+            if (rbCache[shift]) return rbCache[shift];
+            const c = document.createElement('canvas'); c.width = 32; c.height = 20; const x = c.getContext('2d');
+            for (let j = 0; j < 20; j++) { x.fillStyle = `hsl(${(j * 18 + shift) % 360},100%,60%)`; x.fillRect(0, j, 32, 1); }
+            for (let n = 0; n < 140; n++) { x.fillStyle = `hsl(${Math.random() * 360},100%,${35 + Math.random() * 45}%)`; x.fillRect(Math.random() * 32 | 0, Math.random() * 20 | 0, 1 + Math.random() * 4 | 0, 1 + Math.random() * 2 | 0); }
+            return rbCache[shift] = c.toDataURL('image/png');
+        }
+        function spriteUrl(w) {
+            return ({ cow: cowImg, chicken: chickenImg, farmer: getFarmerImg(MAPS[mapIdx].hats[0]), boss: getFarmerImg('#ff2222') }[w] || cowImg).src;
+        }
+        const CUTS = {
+            intro: [
+                { who: ['cow', 'chicken'], t: "Once upon a time, Billy the cow lived a totally normal life. He ate grass. He took naps. He had one friend: GARY THE CHICKEN." },
+                { who: ['cow'], t: "Then the farmers UNIONIZED. They demanded 400% more milk. Billy said, 'No thank you.'" },
+                { who: ['farmer', 'chicken'], t: "So the farmers kidnapped Gary!!! Nobody knows why. He is a chicken. He is not worth much." },
+                { who: ['cow'], t: "BILLY: 'I WILL FIND YOU, GARY. AND I WILL MILK-SPLAT EVERYONE.' His udder had never felt so powerful." }],
+            map1: [
+                { who: ['cow', 'farmer'], t: "Gary's feathers lead to the HAUNTED PUMPKIN PATCH! The farmers here have pumpkin faces. Or are they wearing them? Nobody checks." },
+                { who: ['farmer'], t: "'Boo,' said the farmer. 'I mean BOO.' That was the whole scary thing. Billy was unimpressed. RARE POWER-UP UNLOCKED: COLD MOO-LK!" }],
+            map2: [
+                { who: ['farmer', 'chicken'], t: "A squeaky pumpkin farmer confessed: 'Gary got launched to the CHEESE MOON! Use the bathtub rocket!'" },
+                { who: ['cow'], t: "Billy built a rocket from a bathtub, 3 hay bales, and pure rage. It worked. Nobody knows how. RARE POWER-UP UNLOCKED: MOO-STAR!" }],
+            map3: [
+                { who: ['cow', 'chicken'], t: "On the moon Billy heard a muffled 'BAWK!' Gary was dragged through a glowing portal to the DISCO DAIRY DIMENSION!" },
+                { who: ['farmer'], t: "Here the farmers dance 24/7. Their moves are terrible. Their punches are worse. RARE POWER-UP UNLOCKED: DISCO FEVER!" }],
+            final: [
+                { who: ['boss'], t: "A giant shape stomped out of a disco ball. FARMER PRIME. 'I have been waiting for you, cow,' he said, in a very normal voice." },
+                { who: ['cow', 'boss'], t: "'Where is Gary?' 'Gary is not here.' 'Where. Is. GARY.' The ground shook. It was the most serious moment in cow history." }],
+            ending: [
+                { who: ['boss'], t: "Farmer Prime fell. His mask cracked open. Inside was... another farmer. Just a regular one. He apologized." },
+                { who: ['cow', 'chicken'], t: "Gary was behind a curtain eating snacks. He had been at a SPA the whole time. 'BAWK,' said Gary. 'Don't be dramatic.'" },
+                { who: ['cow', 'chicken'], t: "Billy and Gary went home. The farmers were fired. The union dissolved. THE END!!! (Or is it? ENDLESS MODE unlocked...)" }]
+        };
+        function playCut(key, done) {
+            const sc = CUTS[key], cut = document.getElementById('cut'), stage = document.getElementById('cutStage'), txt = document.getElementById('cutText');
+            let i = 0, timer;
+            paused = true; firing = false;
+            function show() {
+                if (i >= sc.length) { cut.style.display = 'none'; clearInterval(timer); cut.onclick = null; done && done(); return; }
+                const s = sc[i++];
+                cut.style.backgroundImage = `url(${rainbowPng((i * 70 + key.length * 40) % 360)})`;
+                stage.innerHTML = s.who.map(w => `<img src="${spriteUrl(w)}">`).join('');
+                txt.textContent = ''; let n = 0; clearInterval(timer);
+                timer = setInterval(() => { txt.textContent = s.t.slice(0, ++n); if (n >= s.t.length) clearInterval(timer); }, 28);
+            }
+            cut.onclick = () => {
+                if (txt.textContent.length < sc[i - 1].t.length) { clearInterval(timer); txt.textContent = sc[i - 1].t; } else show();
+            };
+            cut.style.display = 'flex'; show();
+        }
+        function switchMap(i) {
+            mapIdx = i; buildFarm();
+            enemies.length = 0; pickups.length = 0; bullets.length = 0; bossSpawned = false;
+            player.x = WORLD_W / 2; player.y = WORLD_H / 2;
+            cam.x = player.x - canvas.width / 2; cam.y = player.y - canvas.height / 2;
+            flash = 1; shake = 20;
+        }
+        function checkUnlock() {
+            if (mapIdx < MAPS.length - 1 && level >= MAPS[mapIdx + 1].lvl) {
+                switchMap(mapIdx + 1);
+                const done = () => { paused = false; say('WELCOME TO ' + MAPS[mapIdx].name + '!!!', player.x, player.y - 60); gainXp(0); };
+                storyMode ? playCut('map' + mapIdx, done) : done();
+                return true;
+            }
+            if (!finalSpawned && mapIdx === MAPS.length - 1 && level >= 16) {
+                finalSpawned = true;
+                const go = () => {
+                    paused = false; bossSpawned = true;
+                    enemies.push({ x: player.x + 320, y: player.y, size: 220, hp: 300, maxHp: 300, speed: 1.4, isBoss: true, isFinal: true });
+                    say('FARMER PRIME!!!', player.x, player.y - 60);
+                };
+                storyMode ? playCut('final', go) : go();
+                return true;
+            }
+            return false;
+        }
+        function playEnding() {
+            const end = () => { paused = false; say('ENDLESS MODE UNLOCKED!!!', player.x, player.y - 60); };
+            storyMode ? playCut('ending', end) : say('YOU BEAT THE GAME!!!', player.x, player.y - 60);
+        }
+        (function initStart() {
+            const st = document.getElementById('start'), sp = document.getElementById('stSprites');
+            sp.innerHTML = [cowImg, getFarmerImg('#e6b94f'), chickenImg, getFarmerImg('#a68bd4')].map(i => `<img src="${i.src}">`).join('');
+            for (let n = 0; n < 12; n++) {
+                const d = document.createElement('div'); d.className = 'sticker';
+                d.style.backgroundImage = `url(${rainbowPng(Math.floor(Math.random() * 9) * 40)})`; d.style.backgroundSize = '100% 100%';
+                d.style.left = Math.random() * 90 + '%'; d.style.top = Math.random() * 90 + '%';
+                d.style.width = d.style.height = 24 + Math.random() * 50 + 'px'; d.style.borderRadius = Math.random() < .5 ? '50%' : '4px';
+                d.style.animationDelay = -Math.random() + 's'; st.appendChild(d);
+            }
+            let sh = 0; st.style.backgroundImage = `url(${rainbowPng(0)})`;
+            const flick = setInterval(() => { sh = (sh + 40) % 360; st.style.backgroundImage = `url(${rainbowPng(sh)})`; }, 350);
+            document.getElementById('btnStory').onclick = () => { clearInterval(flick); st.style.display = 'none'; storyMode = true; playCut('intro', () => { paused = false; }); };
+            document.getElementById('btnEndless').onclick = () => { clearInterval(flick); st.style.display = 'none'; storyMode = false; paused = false; };
+        })();
+        // ===============================================
+
+
+        // ===== EXTRA STUPIDITY =====
+        pu.spin = 0;
+        const dmgs = [], emos = [];
+        let comboN = 0, lastKillT = 0, eventT = 0, cowBub = null, lastBoop = 0, ac = null;
+        const ACCS = ['🍍', '🐔', '🧀', '🥕', '🎈', '🍕', '🪣', '🦆', '🥔', '🧦', '🍌', '🪿'];
+        const HATS = ['', '🎀', '🎩', '🤠', '👑', '🥳', '🧢', '🪩', '🍕', '🦆', '👽', '🎃', '🛸', '🔥'];
+        const EMO = ['🥛', '🌽', '🥕', '🐔', '🧀', '⭐', '🍕', '🦆'];
+        const COW_SAYS = ['MOO', 'I AM BILLY', 'SPLAT TIME', 'GARY??', 'EAT MY MILK', 'MOOOOOOO', 'MILK ME NOT', 'BORK (I AM A COW)', 'WHERE IS MY HAT'];
+        const COMBOS = { 3: 'TRIPLE MOO!', 5: 'MOO-LTI KILL!!', 8: 'UDDER CHAOS!!!', 12: 'MILKAGEDDON!!!!', 20: 'GARY WOULD BE PROUD!!!' };
+        function boop(f0, f1, d, type) {
+            const n = performance.now(); if (n - lastBoop < 60) return; lastBoop = n;
+            try {
+                ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+                const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+                o.type = type || 'sawtooth'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + d);
+                g.gain.setValueAtTime(.1, t); g.gain.exponentialRampToValueAtTime(.001, t + d);
+                o.connect(g); g.connect(ac.destination); o.start(); o.stop(t + d);
+            } catch (e) {}
+        }
+        function combo() {
+            const n = performance.now(); comboN = (n - lastKillT < 2000) ? comboN + 1 : 1; lastKillT = n;
+            if (COMBOS[comboN]) { say(COMBOS[comboN], player.x, player.y - 90); flash = .3; }
+        }
+        function burstEmo(e) {
+            for (let i = 0; i < (e.isBoss ? 22 : 8); i++) emos.push({ x: e.x, y: e.y, vx: (Math.random() - .5) * 10, vy: -Math.random() * 9 - 2, life: 50, c: EMO[Math.floor(Math.random() * EMO.length)] });
+        }
+        function crazyStuff() {
+            if (!cowBub && Math.random() < 0.004) cowBub = { text: COW_SAYS[Math.floor(Math.random() * COW_SAYS.length)], life: 100 };
+            if (pu.spin > 0 && pu.spin % 4 === 0) {
+                for (let k = 0; k < 2; k++) {
+                    const a = pu.spin * .5 + k * Math.PI;
+                    bullets.push({ x: player.x, y: player.y, vx: Math.cos(a) * 11, vy: Math.sin(a) * 11, size: 13 * player.bsize, dmg: player.dmg, pierce: false, hit: new Set() });
+                }
+            }
+            if (++eventT > 1500 && enemies.length) {
+                eventT = 0; const r = Math.floor(Math.random() * 3);
+                if (r === 0) {
+                    say('FARMER STAMPEDE!!!', player.x, player.y - 70);
+                    for (let i = 0; i < 14; i++) {
+                        const a = i / 14 * 6.283;
+                        enemies.push({ x: player.x + Math.cos(a) * 450, y: player.y + Math.sin(a) * 450, size: 34, hp: 2 + wave, maxHp: 2 + wave, speed: 2.6, isBoss: false,
+                            wobble: Math.random() * 6, acc: ACCS[Math.floor(Math.random() * ACCS.length)], hatColor: MAPS[mapIdx].hats[0] });
+                    }
+                } else if (r === 1) {
+                    say('FREE PIE FRIDAY!!!', player.x, player.y - 70);
+                    for (let i = 0; i < 4; i++) pickups.push({ x: player.x + (Math.random() - .5) * 300, y: player.y + (Math.random() - .5) * 300, t: pickPU(), life: 900 });
+                } else { say('BILLY SPIN!!!', player.x, player.y - 70); pu.spin = 200; }
+            }
+        }
+        // ===========================
+
+        const bullets = [];
+        const enemies = [];
+        const particles = [];
+
+        function drawCow(x, y, size) {
+            const t = performance.now();
+            ctx.save(); ctx.translate(x, y + Math.sin(t / 90) * 2); ctx.rotate(Math.sin(t / 160) * 0.12 + (pu.spin > 0 ? t / 60 : 0));
+            spr(cowImg, size * 2.1, size * 2.1, '#fff27a');
+            const hh = HATS[Math.min(level - 1, HATS.length - 1)];
+            if (hh) { ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(hh, 0, -size * 1.05); }
+            ctx.restore();
+        }
+
+        function drawFarmer(x, y, size, hat) {
+            const t = performance.now();
+            ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t / 140 + x) * 0.14);
+            spr(getFarmerImg(hat || '#e6b94f'), size * 2, size * 2, '#ff2d55');
+            ctx.restore();
+        }
+
+        function drawBoss(x, y, size) {
+            const t = performance.now();
+            ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t / 200) * 0.08);
+            ctx.shadowColor = '#ff2222'; ctx.shadowBlur = 30;
+            spr(getFarmerImg('#ff2222'), size * 1.5, size * 1.5);
+            ctx.restore();
+        }
+
+        function shoot() {
+            if (gameOver || paused) return;
+            let target = null, nearest = Infinity;
+            for (const e of enemies) {
+                const d = Math.hypot(e.x - player.x, e.y - player.y);
+                if (d < nearest) { nearest = d; target = e; }
+            }
+            const aimX = target ? target.x : mouse.x + cam.x;
+            const aimY = target ? target.y : mouse.y + cam.y;
+            const angle = Math.atan2(aimY - player.y, aimX - player.x);
+            const mega = pu.mega > 0;
+            const shots = Math.min(player.shots + (pu.rapid > 0 ? 2 : 0), 10);
+            for (let i = 0; i < shots; i++) {
+                const spread = (i - (shots - 1) / 2) * 0.15;
+                bullets.push({
+                    x: player.x, y: player.y,
+                    vx: Math.cos(angle + spread) * 12, vy: Math.sin(angle + spread) * 12,
+                    size: 13 * player.bsize * (mega ? 2 : 1), dmg: player.dmg * (mega ? 3 : 1),
+                    pierce: mega, hit: new Set()
+                });
+            }
+        }
+
+        function spawnEnemy() {
+            if (wave % 5 === 0 && !bossSpawned) {
+                enemies.push({
+                    x: cam.x + (Math.random() > 0.5 ? -150 : canvas.width + 150),
+                    y: cam.y + Math.random() * canvas.height,
+                    size: 150, hp: 50 * wave, maxHp: 50 * wave,
+                    speed: 1.2 + (wave * 0.1), isBoss: true
+                });
+                bossSpawned = true;
+            } else if (wave % 5 !== 0) {
+                // A whole crowd of increasingly ridiculous farmers arrives together.
+                const crowdSize = Math.min(3 + Math.floor(wave * 0.8), 14);
+                for (let n = 0; n < crowdSize && enemies.length < 100; n++) {
+                    let side = Math.floor(Math.random() * 4);
+                    let ex = 0, ey = 0;
+                    if(side === 0) { ex = Math.random() * canvas.width; ey = -50; }
+                    if(side === 1) { ex = canvas.width + 50; ey = Math.random() * canvas.height; }
+                    if(side === 2) { ex = Math.random() * canvas.width; ey = canvas.height + 50; }
+                    if(side === 3) { ex = -50; ey = Math.random() * canvas.height; }
+                    ex += cam.x; ey += cam.y;
+
+                    const vr = Math.random(), mulS = vr < .12 ? 1.7 : (vr < .3 ? .8 : 1), mulHp = vr < .12 ? 3 : 1, mulSp = vr < .12 ? .6 : (vr < .3 ? 1.7 : 1);
+                    const hp = Math.ceil((2 + wave + Math.floor(Math.random() * 2)) * mulHp * (1 + mapIdx * 0.4));
+                    enemies.push({
+                        x: ex, y: ey, size: (34 + Math.random() * 8) * mulS,
+                        hp: hp, maxHp: hp,
+                        speed: (1.35 + (wave * 0.11) + Math.random() * 0.45) * mulSp,
+                        isBoss: false,
+                        wobble: Math.random() * Math.PI * 2,
+                        acc: ACCS[Math.floor(Math.random() * ACCS.length)],
+                        hatColor: MAPS[mapIdx].hats[Math.floor(Math.random()*4)]
+                    });
+                }
+            }
+        }
+
+        function update(time) {
+            if (gameOver || paused) return;
+
+            // Keyboard + mobile joystick movement, normalized diagonals.
+            let mx = joy.x, my = joy.y;
+            if (keys['a'] || keys['arrowleft']) mx -= 1;
+            if (keys['d'] || keys['arrowright']) mx += 1;
+            if (keys['w'] || keys['arrowup']) my -= 1;
+            if (keys['s'] || keys['arrowdown']) my += 1;
+            const mag = Math.hypot(mx, my);
+            if (mag > 1) { mx /= mag; my /= mag; }
+            const spd = player.speed * (pu.speed > 0 ? 1.7 : 1);
+            player.x = Math.max(player.size/2, Math.min(WORLD_W - player.size/2, player.x + mx*spd));
+            player.y = Math.max(player.size/2, Math.min(WORLD_H - player.size/2, player.y + my*spd));
+            cam.x = Math.max(0, Math.min(WORLD_W - canvas.width, player.x - canvas.width / 2));
+            cam.y = Math.max(0, Math.min(WORLD_H - canvas.height, player.y - canvas.height / 2));
+            for (const k in pu) if (pu[k] > 0) pu[k]--;
+            if (player.inv > 0) player.inv--;
+            const fi = player.fireInt * (pu.rapid > 0 ? 0.35 : 1);
+            if ((firing || enemies.length) && time - lastShot > fi) { shoot(); lastShot = time; }
+            updatePickups(); crazyStuff();
+
+            // Spawning
+            if (time - lastSpawn > spawnRate) {
+                spawnEnemy();
+                lastSpawn = time;
+                spawnRate = Math.max(650, 1750 - (wave * 65)); // Farm chaos accelerates!
+            }
+
+            // Wave progression
+            if(kills > wave * 15 && !bossSpawned) {
+                wave++;
+                document.getElementById('waveDisplay').innerText = wave;
+            }
+
+            // Bullets
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i];
+                b.x += b.vx;
+                b.y += b.vy;
+                if (b.x < cam.x - 80 || b.x > cam.x + canvas.width + 80 || b.y < cam.y - 80 || b.y > cam.y + canvas.height + 80) {
+                    bullets.splice(i, 1);
+                }
+            }
+
+            // Enemies
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                let e = enemies[i];
+                if (e.hp <= 0) { enemies.splice(i, 1); registerKill(e); continue; }
+                if (!e.isBoss) { if (e.say) { if (--e.say.t <= 0) e.say = null; } else if (Math.random() < 0.0006) e.say = { text: MAPS[mapIdx].say[Math.floor(Math.random() * MAPS[mapIdx].say.length)], t: 100 }; }
+                let angle = Math.atan2(player.y - e.y, player.x - e.x);
+                const fz = pu.freeze > 0 ? 0 : 1; e.x += Math.cos(angle) * e.speed * fz;
+                e.y += (Math.sin(angle) * e.speed + (e.isBoss ? 0 : Math.sin(time/130 + (e.wobble || 0)) * 0.45)) * fz;
+
+                // Collision with player
+                let dist = Math.hypot(player.x - e.x, player.y - e.y);
+                if (dist < (player.size/2 + e.size/2 - 10)) hurt(e, angle);
+
+                // Collision with bullets (Milk)
+                for (let j = bullets.length - 1; j >= 0; j--) {
+                    let b = bullets[j];
+                    let bDist = Math.hypot(b.x - e.x, b.y - e.y);
+                    if (bDist < e.size/2 + b.size && !b.hit.has(e)) {
+                        e.hp -= b.dmg; dmgs.push({ x: e.x + (Math.random() - .5) * 24, y: e.y - e.size * .6, v: Math.round(b.dmg), life: 30 });
+                        if (b.pierce) b.hit.add(e); else bullets.splice(j, 1);
+                        
+                        // Confetti-like cream puffs: no blood or grim effects.
+                        for(let k=0; k<9; k++) {
+                            particles.push({
+                                x: e.x, y: e.y,
+                                vx: (Math.random()-0.5)*7, vy: (Math.random()-0.5)*7,
+                                life: 25, h: Math.random()*360
+                            });
+                        }
+
+                        if (e.hp <= 0) {
+                            enemies.splice(i, 1);
+                            registerKill(e);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Particles update
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life--;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            const T = performance.now();
+            ctx.imageSmoothingEnabled = false; ctx.drawImage(farmBG, cam.x / FARM_K, cam.y / FARM_K, canvas.width / FARM_K, canvas.height / FARM_K, 0, 0, canvas.width, canvas.height); ctx.imageSmoothingEnabled = true;
+            ctx.fillStyle = mapIdx === 3 ? 'rgba(0,0,0,.4)' : 'rgba(0,0,0,.14)'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            if (shake > 0) { ctx.translate((Math.random()-.5)*shake, (Math.random()-.5)*shake); shake *= 0.88; if (shake < .5) shake = 0; }
+            ctx.translate(-cam.x, -cam.y);
+            // Particles
+            for (let p of particles) {
+                ctx.fillStyle = `hsla(${p.h || 50}, 100%, 65%, ${Math.min(1, p.life/20)})`;
+                ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill();
+            }
+
+            // Crappy milk splats.
+            for (let b of bullets) {
+                ctx.save();
+                ctx.translate(b.x, b.y);
+                ctx.rotate(Math.atan2(b.vy, b.vx) + T / 150);
+                ctx.shadowColor = `hsl(${(T/4)%360}, 100%, 65%)`; ctx.shadowBlur = 30;
+                spr(splatImg, b.size * 4.4, b.size * 4.4);
+                ctx.restore();
+            }
+
+            for (const p of pickups) {
+                if (p.life < 180 && Math.floor(T / 100) % 2) continue;
+                ctx.save(); ctx.translate(p.x, p.y + Math.sin(T / 150 + p.x) * 4);
+                ctx.shadowColor = p.t.color; ctx.shadowBlur = 25;
+                ctx.fillStyle = p.t.rare ? `hsl(${(T / 3) % 360},100%,60%)` : p.t.color; ctx.beginPath(); ctx.arc(0, 0, p.t.rare ? 25 : 20, 0, 7); ctx.fill();
+                ctx.shadowBlur = 0; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, 0, 16, 0, 7); ctx.fill();
+                ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#000'; ctx.fillText(p.t.icon, 0, 1);
+                ctx.restore();
+            }
+            for (const r of rings) { ctx.strokeStyle = `rgba(154,255,90,${r.life / 30})`; ctx.lineWidth = 12; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, 7); ctx.stroke(); }
+
+            // Enemies
+            for (let e of enemies) {
+                if(e.isBoss) {
+                    drawBoss(e.x, e.y, e.size);
+                    // Boss HP bar
+                    ctx.fillStyle = '#d98562';
+                    ctx.fillRect(e.x - e.size/2, e.y - e.size/2 - 70, e.size, 10);
+                    ctx.fillStyle = '#f2c75c';
+                    ctx.fillRect(e.x - e.size/2, e.y - e.size/2 - 70, e.size * (e.hp/e.maxHp), 10);
+                } else {
+                    drawFarmer(e.x, e.y, e.size, e.hatColor);
+                    ctx.save(); ctx.font = '28px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.translate(e.x, e.y - e.size * .95); ctx.rotate(Math.sin(T / 120 + e.wobble) * .4); ctx.fillText(e.acc || '', 0, 0); ctx.restore();
+                    if (e.say) { ctx.save(); ctx.font = "900 13px 'Comic Sans MS', cursive"; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.strokeText(e.say.text, e.x, e.y - e.size * 1.4); ctx.fillStyle = '#c0182b'; ctx.fillText(e.say.text, e.x, e.y - e.size * 1.4); ctx.restore(); }
+                    // Every farmer gets a visible health bar.
+                    const bw = e.size * 1.3, bh = 9;
+                    const bx = e.x - bw/2, by = e.y + e.size*.95;
+                    ctx.fillStyle = 'rgba(49,45,40,.8)';
+                    ctx.beginPath(); ctx.roundRect(bx-1, by-1, bw+2, bh+2, 4); ctx.fill();
+                    ctx.fillStyle = '#d98562';
+                    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 3); ctx.fill();
+                    ctx.fillStyle = '#a8d66d';
+                    ctx.beginPath(); ctx.roundRect(bx, by, bw * Math.max(0, e.hp/e.maxHp), bh, 3); ctx.fill();
+                }
+            }
+
+            for (let i = dmgs.length - 1; i >= 0; i--) {
+                const d = dmgs[i]; d.y -= 1.2;
+                ctx.save(); ctx.font = "900 20px Impact, 'Arial Black', sans-serif"; ctx.textAlign = 'center'; ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+                ctx.strokeText(d.v, d.x, d.y); ctx.fillStyle = '#ffe14f'; ctx.fillText(d.v, d.x, d.y); ctx.restore();
+                if (--d.life <= 0) dmgs.splice(i, 1);
+            }
+            for (let i = emos.length - 1; i >= 0; i--) {
+                const m = emos[i]; m.x += m.vx; m.y += m.vy; m.vy += .35;
+                ctx.save(); ctx.globalAlpha = Math.min(1, m.life / 20); ctx.font = '26px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(m.c, m.x, m.y); ctx.restore();
+                if (--m.life <= 0) emos.splice(i, 1);
+            }
+            if (cowBub) {
+                ctx.save(); ctx.font = "900 14px 'Comic Sans MS', cursive"; ctx.textAlign = 'center';
+                const tw = ctx.measureText(cowBub.text).width + 18, bx = player.x - tw / 2, by = player.y - 105;
+                ctx.fillStyle = '#fff'; ctx.strokeStyle = '#111'; ctx.lineWidth = 3; ctx.beginPath(); ctx.roundRect(bx, by, tw, 26, 8); ctx.fill(); ctx.stroke();
+                ctx.fillStyle = '#111'; ctx.fillText(cowBub.text, player.x, by + 18); ctx.restore();
+                if (--cowBub.life <= 0) cowBub = null;
+            }
+            // Player
+            if (!gameOver) {
+                if (player.inv <= 0 || Math.floor(T / 80) % 2) drawCow(player.x, player.y, player.size);
+                ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(player.x - 27, player.y + 48, 54, 8); ctx.fillStyle = '#ff4d6d'; ctx.fillRect(player.x - 25, player.y + 50, 50 * Math.max(0, player.hp / player.maxHp), 4);
+                if (pu.shield > 0 || pu.star > 0) { ctx.strokeStyle = `hsl(${(T / 3) % 360},100%,70%)`; ctx.lineWidth = 4; ctx.beginPath(); ctx.arc(player.x, player.y, 44, 0, 7); ctx.stroke(); }
+            }
+            ctx.restore();
+
+            // off-screen arrows
+            {
+                ctx.save();
+                const cx = canvas.width / 2, cy = canvas.height / 2, m = 26;
+                const pt = (wx, wy) => {
+                    const sx = wx - cam.x, sy = wy - cam.y;
+                    if (sx > 0 && sx < canvas.width && sy > 0 && sy < canvas.height) return null;
+                    const a = Math.atan2(sy - cy, sx - cx);
+                    const t = Math.min((cx - m) / (Math.abs(Math.cos(a)) || 1e-6), (cy - m) / (Math.abs(Math.sin(a)) || 1e-6));
+                    return { x: cx + Math.cos(a) * t, y: cy + Math.sin(a) * t, a };
+                };
+                const near = enemies.map(e => ({ e, d: Math.hypot(e.x - player.x, e.y - player.y) })).sort((p, q) => p.d - q.d).slice(0, 8);
+                for (const { e } of near) {
+                    const q = pt(e.x, e.y); if (!q) continue;
+                    ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.a);
+                    ctx.fillStyle = e.isBoss ? '#ffe14f' : '#ff2d55'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-10, -10); ctx.lineTo(-10, 10); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+                }
+                ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                for (const p of pickups) { const q = pt(p.x, p.y); if (q) ctx.fillText(p.t.icon, q.x, q.y); }
+                ctx.restore();
+            }
+            // HUD: xp bar, active power-ups, minimap
+            {
+                const bw = canvas.width * .4, bx = canvas.width * .3, by = 38;
+                ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(bx - 2, by - 2, bw + 4, 14);
+                ctx.fillStyle = `hsl(${(T / 5) % 360},100%,60%)`; ctx.fillRect(bx, by, bw * Math.min(1, xp / xpNeed), 10);
+                ctx.font = '900 11px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.fillText('LV ' + level, canvas.width / 2, by + 24); ctx.fillText(MAPS[mapIdx].name, canvas.width / 2, by + 38);
+                if (pu.freeze > 0) { ctx.fillStyle = 'rgba(150,220,255,.2)'; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = '#fff'; }
+                ctx.textAlign = 'left'; let ly = 118;
+                for (const t of PUS) if (pu[t.k] > 0) { ctx.fillStyle = t.color; ctx.fillText(t.icon + ' ' + t.name + ' ' + Math.ceil(pu[t.k] / 60) + 's', 14, ly); ly += 16; }
+                const ms = 80, mx = canvas.width - ms - 10, my = 56, k = ms / WORLD_W;
+                ctx.fillStyle = 'rgba(40,100,40,.75)'; ctx.fillRect(mx, my, ms, ms);
+                ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.strokeRect(mx, my, ms, ms);
+                ctx.strokeRect(mx + cam.x * k, my + cam.y * k, canvas.width * k, canvas.height * k);
+                ctx.fillStyle = '#f33'; for (const e of enemies) ctx.fillRect(mx + Math.max(0, Math.min(ms - 2, e.x * k)), my + Math.max(0, Math.min(ms - 2, e.y * k)), 2, 2);
+                ctx.fillStyle = '#ff0'; for (const p of pickups) ctx.fillRect(mx + p.x * k, my + p.y * k, 3, 3);
+                ctx.fillStyle = '#fff'; ctx.fillRect(mx + player.x * k - 2, my + player.y * k - 2, 4, 4);
+            }
+            // Dramatic BILLY popups
+            for (let i = popups.length - 1; i >= 0; i--) {
+                const p = popups[i];
+                const k = p.life / p.max;
+                const scale = (p.boss ? 1.6 : 1) * (1 + (1 - k) * 0.6) * Math.min(1, (1 - k) * 8 + .4);
+                const fs = Math.min(canvas.width / (p.boss ? 11 : 7), p.boss ? 70 : 54);
+                ctx.save();
+                ctx.translate(Math.max(110, Math.min(canvas.width - 110, p.x - cam.x)) + (Math.random()-.5)*6, Math.max(90, p.y - cam.y) - (1 - k) * 60 + (Math.random()-.5)*6);
+                ctx.rotate(p.rot + Math.sin(T/30) * 0.04);
+                ctx.scale(scale, scale);
+                ctx.globalAlpha = Math.min(1, k * 2.5);
+                ctx.font = `900 ${fs}px Impact, 'Arial Black', sans-serif`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.lineJoin = 'round'; ctx.lineWidth = 9; ctx.strokeStyle = '#1a0a2e';
+                ctx.strokeText(p.text, 0, 0);
+                const tg = ctx.createLinearGradient(0, -fs/2, 0, fs/2);
+                tg.addColorStop(0, '#fff176'); tg.addColorStop(.5, '#ff4d6d'); tg.addColorStop(1, '#c20bff');
+                ctx.fillStyle = tg; ctx.fillText(p.text, 0, 0);
+                ctx.restore();
+                if (--p.life <= 0) popups.splice(i, 1);
+            }
+            if (flash > 0) {
+                ctx.fillStyle = `rgba(255,255,255,${flash * 0.5})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                flash *= 0.85; if (flash < .02) flash = 0;
+            }
+        }
+
+        function loop(time) {
+            update(time);
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
